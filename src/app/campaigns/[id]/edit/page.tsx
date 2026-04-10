@@ -160,7 +160,7 @@ export default function EditCampaignPage() {
     }
   }
 
-  const availablePlaceholders = ['name', 'email', ...new Set(contacts.flatMap(c => Object.keys(c.customFields || {})).filter(k => k !== 'name' && k !== 'email'))]
+  const availablePlaceholders = ['name', 'email', ...Array.from(new Set(contacts.flatMap(c => Object.keys(c.customFields || {})).filter(k => k !== 'name' && k !== 'email')))]
 
   if (status === 'loading' || loading) {
     return <AppLayout><div className="flex items-center justify-center min-h-[400px]"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div></AppLayout>
