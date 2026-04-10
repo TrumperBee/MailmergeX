@@ -6,7 +6,7 @@ import { useRouter, useParams } from 'next/navigation'
 import AppLayout from '@/components/layout/AppLayout'
 import { MailMergeEngine, isValidEmail } from '@/lib/mail-merge'
 import Link from 'next/link'
-import { ArrowLeft, Send, AlertCircle, Loader2, Eye, Mail, Paperclip, Image, FileText, File } from 'lucide-react'
+import { ArrowLeft, Send, AlertCircle, Loader2, Eye, Mail, Paperclip, Image, FileText, File, Settings } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Attachment {
@@ -66,8 +66,9 @@ export default function SendCampaignPage() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
-  const [showPreview, setShowPreview] = useState(false)
+  const [showPreview, setShowPreview] = useState(true)
   const [previewContact, setPreviewContact] = useState(0)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -87,7 +88,11 @@ export default function SendCampaignPage() {
         setCampaign(campaignData.campaign)
         setContacts(campaignData.contacts || [])
       }
-      if (smtpRes.ok) setSmtpConfig(smtpData)
+      if (smtpRes.ok && smtpData) {
+        setSmtpConfig(smtpData)
+      } else {
+        setShowSettingsModal(true)
+      }
     } catch {
       toast.error('Failed to load campaign')
     } finally {
@@ -101,7 +106,7 @@ export default function SendCampaignPage() {
     ? new MailMergeEngine(campaign.template, campaign.subject || '')
     : null
 
-  const previewEmails = mailMerge
+  const previewEmails = mailMerge && validContacts.length > 0
     ? mailMerge.generateBulkEmails(validContacts.slice(0, 3).map(c => ({
         email: c.email,
         name: c.name || null,
@@ -110,13 +115,19 @@ export default function SendCampaignPage() {
     : []
 
   const sendEmails = async () => {
-    if (!campaign || !smtpConfig || !mailMerge) {
-      toast.error('Missing configuration')
+    if (!smtpConfig) {
+      setShowSettingsModal(true)
+      toast.error('Please set up your email account first!')
+      return
+    }
+
+    if (!campaign || !mailMerge) {
+      toast.error('Campaign not loaded properly')
       return
     }
 
     if (validContacts.length === 0) {
-      toast.error('No valid contacts')
+      toast.error('No valid contacts to send')
       return
     }
 
@@ -218,7 +229,7 @@ export default function SendCampaignPage() {
         }),
       })
 
-      toast.success(`Sent ${sent} emails${failed > 0 ? `, ${failed} failed` : ''}`)
+      toast.success(`Sent ${sent} emails${failed > 0 ? `, ${failed} failed` : ''}!`)
       router.push(`/campaigns/${campaign.id}`)
     } catch (error: any) {
       toast.error(error.message || 'Failed to send emails')
@@ -246,21 +257,89 @@ export default function SendCampaignPage() {
           <p className="text-gray-400 mt-1">{campaign.name}</p>
         </div>
 
+        {/* SMTP Not Configured Alert */}
         {!smtpConfig && (
-          <div className="bg-yellow-900/30 border border-yellow-700 rounded-xl p-6 mb-8">
+          <div className="bg-yellow-900/30 border border-yellow-600 rounded-xl p-6 mb-6">
             <div className="flex items-start gap-4">
               <AlertCircle className="w-6 h-6 text-yellow-500 flex-shrink-0" />
               <div>
-                <h3 className="text-lg font-semibold text-yellow-400 mb-2">SMTP Not Configured</h3>
-                <p className="text-gray-300 mb-4">Configure SMTP settings before sending emails.</p>
-                <Link href="/settings" className="inline-block px-4 py-2 bg-yellow-600 text-white font-medium rounded-lg">Configure SMTP</Link>
+                <h3 className="text-lg font-semibold text-yellow-400 mb-2">
+                  Email Account Not Set Up
+                </h3>
+                <p className="text-gray-300 mb-4">
+                  You need to connect your email account before you can send emails.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowSettingsModal(true)}
+                    className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-medium rounded-lg transition-colors"
+                  >
+                    Set Up Email Now
+                  </button>
+                  <Link
+                    href="/settings"
+                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors"
+                  >
+                    Go to Settings
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
         )}
 
+        {/* SMTP Settings Modal */}
+        {showSettingsModal && (
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+            <div className="bg-gray-800 rounded-2xl p-6 max-w-lg w-full border border-gray-700">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-white">Set Up Your Email Account</h2>
+                <button onClick={() => setShowSettingsModal(false)} className="text-gray-400 hover:text-white">✕</button>
+              </div>
+              
+              <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-4">
+                <h3 className="text-blue-400 font-medium mb-2">📧 For Gmail:</h3>
+                <ol className="text-sm text-gray-300 space-y-1 list-decimal list-inside">
+                  <li>Go to <span className="font-mono bg-gray-700 px-1 rounded">myaccount.google.com → Security</span></li>
+                  <li>Enable <strong>2-Step Verification</strong></li>
+                  <li>Search for <strong>App Passwords</strong></li>
+                  <li>Select "Mail" → "Other" → Copy the password</li>
+                </ol>
+              </div>
+
+              <div className="bg-gray-700/50 rounded-lg p-4 mb-4">
+                <h3 className="text-white font-medium mb-3">Enter Your Details:</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">SMTP Server</label>
+                    <input type="text" value="smtp.gmail.com" readOnly className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Your Gmail *</label>
+                    <input type="email" placeholder="yourname@gmail.com" className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">App Password *</label>
+                    <input type="password" placeholder="16-character password" className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setShowSettingsModal(false)} className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg">
+                  Cancel
+                </button>
+                <Link href="/settings" className="flex-1 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-center rounded-lg">
+                  Continue to Settings
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sending Progress */}
         {sending && (
-          <div className="bg-primary-900/30 border border-primary-700 rounded-xl p-6 mb-8">
+          <div className="bg-primary-900/30 border border-primary-700 rounded-xl p-6 mb-6">
             <div className="flex items-center gap-4 mb-4">
               <Loader2 className="w-6 h-6 text-primary-500 animate-spin" />
               <h3 className="text-lg font-semibold text-primary-400">Sending Emails...</h3>
@@ -271,88 +350,91 @@ export default function SendCampaignPage() {
                 <span className="text-white">{progress.current} / {progress.total}</span>
               </div>
               <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                <div className="h-full bg-primary-500 rounded-full" style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }} />
+                <div className="h-full bg-primary-500 rounded-full transition-all" style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }} />
               </div>
             </div>
           </div>
         )}
 
         {!sending && (
-          <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 mb-8">
-            <h2 className="text-xl font-semibold text-white mb-6">Ready to Send</h2>
-
-            <div className="grid grid-cols-2 gap-6 mb-6">
-              <div className="bg-gray-700/50 rounded-lg p-4 text-center">
+          <div className="space-y-6">
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-center">
                 <Mail className="w-8 h-8 text-primary-500 mx-auto mb-2" />
                 <p className="text-2xl font-bold text-white">{validContacts.length}</p>
-                <p className="text-sm text-gray-400">Valid Contacts</p>
+                <p className="text-sm text-gray-400">Recipients</p>
               </div>
-              <div className="bg-gray-700/50 rounded-lg p-4 text-center">
-                <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-white">{contacts.length - validContacts.length}</p>
-                <p className="text-sm text-gray-400">Invalid Emails</p>
+              <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-center">
+                <Paperclip className="w-8 h-8 text-gray-500 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-white">{(campaign.attachments || []).length}</p>
+                <p className="text-sm text-gray-400">Attachments</p>
               </div>
             </div>
 
-            {smtpConfig && (
-              <div className="bg-gray-700/50 rounded-lg p-4 mb-6">
-                <h3 className="text-sm font-medium text-gray-400 mb-2">Sending From</h3>
-                <p className="text-white">{smtpConfig.fromName || 'No name'} &lt;{smtpConfig.fromEmail}&gt;</p>
-                <p className="text-sm text-gray-400 mt-1">via {smtpConfig.host}:{smtpConfig.port}</p>
+            {/* Preview */}
+            <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Eye className="w-5 h-5" />
+                  Email Preview
+                </h2>
+                <button onClick={() => setShowPreview(!showPreview)} className="text-primary-400 text-sm">
+                  {showPreview ? 'Hide' : 'Show'}
+                </button>
               </div>
-            )}
-
-            {/* Attachments Info */}
-            {(campaign.attachments || []).length > 0 && (
-              <div className="bg-gray-700/50 rounded-lg p-4 mb-6">
-                <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
-                  <Paperclip className="w-4 h-4" />
-                  Attachments ({campaign.attachments?.length})
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {(campaign.attachments || []).map((file, index) => (
-                    <div key={index} className="flex items-center gap-2 bg-gray-600/50 rounded p-2">
-                      {getFileIcon(file.type)}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm truncate">{file.name}</p>
-                        <p className="text-gray-500 text-xs">{formatFileSize(file.size)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-sm text-gray-400 mt-2">These files will be attached to all outgoing emails.</p>
-              </div>
-            )}
-
-            <div className="border-t border-gray-700 pt-6">
-              <button onClick={() => setShowPreview(!showPreview)} className="flex items-center gap-2 text-primary-500 hover:text-primary-400 mb-4">
-                <Eye className="w-4 h-4" /> {showPreview ? 'Hide' : 'Show'} Preview
-              </button>
 
               {showPreview && previewEmails.length > 0 && (
-                <div className="mb-4">
+                <div>
                   <div className="flex items-center gap-2 mb-4">
                     <button onClick={() => setPreviewContact(Math.max(0, previewContact - 1))}
-                      className="px-3 py-1 bg-gray-700 text-white rounded text-sm" disabled={previewContact === 0}>Prev</button>
+                      className="px-3 py-1 bg-gray-700 text-white rounded text-sm disabled:opacity-50" disabled={previewContact === 0}>
+                      ← Prev
+                    </button>
                     <span className="text-gray-400 text-sm">Contact {previewContact + 1} of {previewEmails.length}</span>
                     <button onClick={() => setPreviewContact(Math.min(previewEmails.length - 1, previewContact + 1))}
-                      className="px-3 py-1 bg-gray-700 text-white rounded text-sm" disabled={previewContact === previewEmails.length - 1}>Next</button>
+                      className="px-3 py-1 bg-gray-700 text-white rounded text-sm disabled:opacity-50" disabled={previewContact === previewEmails.length - 1}>
+                      Next →
+                    </button>
                   </div>
+
                   <div className="bg-gray-700/50 rounded-lg p-4">
-                    <div className="mb-3"><span className="text-sm font-medium text-gray-400">Subject:</span> <span className="text-white">{previewEmails[previewContact].subject}</span></div>
-                    <div className="border-t border-gray-600 pt-3"><div className="text-white whitespace-pre-wrap text-sm" dangerouslySetInnerHTML={{ __html: previewEmails[previewContact].body || '(No content)' }} /></div>
+                    <div className="mb-2 pb-2 border-b border-gray-600">
+                      <p className="text-gray-400 text-sm">Subject:</p>
+                      <p className="text-white font-medium">{previewEmails[previewContact]?.subject || '(No subject)'}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-sm mb-1">To:</p>
+                      <p className="text-primary-400">{previewEmails[previewContact]?.contact?.email}</p>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-gray-600">
+                      <p className="text-gray-400 text-sm mb-1">Body:</p>
+                      <div className="text-gray-200 whitespace-pre-wrap text-sm" dangerouslySetInnerHTML={{ __html: previewEmails[previewContact]?.body || '' }} />
+                    </div>
                   </div>
+                </div>
+              )}
+
+              {showPreview && previewEmails.length === 0 && (
+                <div className="bg-gray-700/50 rounded-lg p-8 text-center">
+                  <Mail className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-400">No contacts available for preview</p>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-4 pt-6 border-t border-gray-700">
-              <Link href={`/campaigns/${campaign.id}`} className="px-6 py-2 text-gray-400 hover:text-white">Cancel</Link>
-              <button onClick={sendEmails} disabled={!smtpConfig || validContacts.length === 0 || sending}
-                className="flex items-center gap-2 px-6 py-2 bg-primary-600 text-white font-medium rounded-lg disabled:opacity-50">
-                <Send className="w-4 h-4" /> Send {validContacts.length} Emails
-              </button>
-            </div>
+            {/* Send Button */}
+            <button
+              onClick={sendEmails}
+              disabled={!smtpConfig || validContacts.length === 0 || sending}
+              className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+            >
+              {sending ? (
+                <><Loader2 className="w-5 h-5 animate-spin" /> Sending...</>
+              ) : (
+                <><Send className="w-5 h-5" /> Send {validContacts.length} Emails</>
+              )}
+            </button>
           </div>
         )}
       </div>
