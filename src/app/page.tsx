@@ -1,7 +1,34 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Send, Mail, Users, Zap, Shield } from 'lucide-react'
+import { Send, Mail, Users, Zap, Loader2 } from 'lucide-react'
 
 export default function HomePage() {
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 800)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-xl bg-primary-600 flex items-center justify-center">
+              <Send className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-2xl font-bold text-white">MailMergeX</span>
+          </div>
+          <Loader2 className="w-8 h-8 animate-spin text-primary-500 mx-auto" />
+          <p className="text-gray-400 mt-4">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
@@ -18,7 +45,7 @@ export default function HomePage() {
               href="/login"
               className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors"
             >
-              Get Started
+              Login
             </Link>
           </div>
         </div>
@@ -42,13 +69,7 @@ export default function HomePage() {
               href="/login"
               className="w-full sm:w-auto px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl transition-colors text-lg"
             >
-              Start for Free
-            </Link>
-            <Link
-              href="/login"
-              className="w-full sm:w-auto px-8 py-4 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-xl transition-colors text-lg"
-            >
-              View Demo
+              Get Started Free
             </Link>
           </div>
         </div>
