@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { campaigns, contacts, smtpSettings } from '@/lib/db/schema'
+import { campaigns, contacts } from '@/lib/db/schema'
 import { eq, desc } from 'drizzle-orm'
 
 export async function GET() {
@@ -22,7 +22,8 @@ export async function GET() {
 
     return NextResponse.json(allCampaigns)
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('GET /api/campaigns error:', error)
+    return NextResponse.json({ error: error.message || 'Failed to fetch campaigns' }, { status: 500 })
   }
 }
 
@@ -46,11 +47,13 @@ export async function POST(request: Request) {
         template: body.template || null,
         status: body.status || 'draft',
         totalEmails: body.totalEmails || 0,
+        attachments: [],
       })
       .returning()
 
     return NextResponse.json(campaign)
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('POST /api/campaigns error:', error)
+    return NextResponse.json({ error: error.message || 'Failed to create campaign' }, { status: 500 })
   }
 }
